@@ -1,44 +1,48 @@
 #!/usr/bin/env bash
-# Prepare my webservers (web-01 & web-02)
+# sets up my web servers for the deployment of web_static
 
-# uncomment for easy debugging
-#set -x
+echo -e "\e[1;32m START\e[0m"
 
-# colors
-blue='\e[1;34m'
-#brown='\e[0;33m'
-green='\e[1;32m'
-reset='\033[0m'
+#--Updating the packages
+sudo apt-get -y update
+sudo apt-get -y install nginx
+echo -e "\e[1;32m Packages updated\e[0m"
+echo
 
-echo -e "${blue}Updating and doing some minor checks...${reset}\n"
+#--configure firewall
+sudo ufw allow 'Nginx HTTP'
+echo -e "\e[1;32m Allow incomming NGINX HTTP connections\e[0m"
+echo
 
-# install nginx if not present
-if [ ! -x /usr/sbin/nginx ]; then
-	sudo apt-get update -y -qq && \
-	     sudo apt-get install -y nginx
-fi
+#--created the dir
+sudo mkdir -p /data/web_static/releases/test /data/web_static/shared
+echo -e "\e[1;32m directories created"
+echo
 
-echo -e "\n${blue}Setting up some minor stuff.${reset}\n"
+#--adds test string
+echo "<h1>Welcome to www.beta-scribbles.tech</h1>" > /data/web_static/releases/test/index.html
+echo -e "\e[1;32m Test string added\e[0m"
+echo
 
-# Create directories...
-sudo mkdir -p /data/web_static/releases/test /data/web_static/shared/
+#--prevent overwrite
+if [ -d "/data/web_static/current" ];
+then
+    echo "path /data/web_static/current exists"
+    sudo rm -rf /data/web_static/current;
+fi;
+echo -e "\e[1;32m prevent overwrite\e[0m"
+echo
 
-# create index.html for test directory
-echo "<h1>Welcome to th3gr00t.tech <\h1>" | sudo dd status=none of=/data/web_static/releases/test/index.html
+#--create symbolic link
+sudo ln -sf /data/web_static/releases/test/ /data/web_static/current
+sudo chown -hR ubuntu:ubuntu /data
 
-# create symbolic link
-sudo ln -sf /data/web_static/releases/test /data/web_static/current
+sudo sed -i '38i\\tlocation /hbnb_static/ {\n\t\talias /data/web_static/current/;\n\t}\n' /etc/nginx/sites-available/default
 
-# give user ownership to directory
-sudo chown -R ubuntu:ubuntu /data/
+sudo ln -sf '/etc/nginx/sites-available/default' '/etc/nginx/sites-enabled/default'
+echo -e "\e[1;32m Symbolic link created\e[0m"
+echo
 
-# backup default server config file
-sudo cp /etc/nginx/sites-enabled/default nginx-sites-enabled_default.backup
-
-# Set-up the content of /data/web_static/current/ to redirect
-# to domain.tech/hbnb_static
-sudo sed -i '37i\\tlocation /hbnb_static/ {\n\t\talias /data/web_static/current/;\n\t}\n' /etc/nginx/sites-available/default
-
+#--restart NGINX
 sudo service nginx restart
-
-echo -e "${green}Completed${reset}"
+echo -e "\e[1;32m restart NGINX\e[0m"
